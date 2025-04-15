@@ -1,18 +1,17 @@
 <template>
     <div>
-        <h1>Main</h1>
+        <h1>Clastic</h1>
         <NuxtLink to="/test-page">Test Page</NuxtLink>
         <br/>
         <label for="link">Link</label>
         <input type="text" id="link" name="link" v-model="link"/>
         <button>Load Site</button>
         <br/>
-        {{ link_to_load }}
-        <br/>
         <label for="selector">Selector</label>
         <input type="text" id="selector" name="selector" v-model="selector"/>
         <button>Select Element</button>
         <br/>
+        <div ref="selection_holder" class="site"/>
         <div ref="site_holder" class="site"/>
     </div>
 </template>
@@ -29,14 +28,16 @@ const site = await useAsyncData('site', async () => {
 }, { watch: [link_to_load] })
 const site_holder = useTemplateRef('site_holder')
 onMounted(async () => {
-    if (site.error || !site.data.value) {
-        console.error(site.error)
+    if (site.error.value) {
+        console.error('Error fetching site data via API:', site.error.value)
         return
     }
+    
     if (!site_holder.value) return
-    site_holder.value.attachShadow({ mode: 'open' })
+    site_holder.value.attachShadow({ mode: 'open' });
+    
     if (!site_holder.value.shadowRoot) return
-    site_holder.value.shadowRoot.innerHTML = site.data.value ?? 'no data'
+    site_holder.value.shadowRoot.innerHTML = site.data.value ?? 'no data';
 })
 </script>
 
