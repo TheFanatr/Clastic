@@ -19,23 +19,16 @@
 
     const link = ref(<string>useRoute().query.site || 'https://www.example.com')
     const link_to_load = computed(() => `${useRequestURL().origin}/api/site?link=${encodeURIComponent(link.value)}`) // useRequestURL() needed for SSR to work; /api/site as a reative route does not work on the server.
-    const selector = ref('body>div>h1 ~ p ~ p')
+    const selector = ref('html>body>div>h1~p~p')
     const site_holder = useTemplateRef('site_holder')
     const selection_holder = useTemplateRef('selection_holder')
-    // const { data: site_data, error: site_error, status: site_status } = useFetch(link_to_load)
     const site = await useAsyncData('site', async () => {
         const site_data = await fetch(link_to_load.value)
         return await site_data.text()
     }, { watch: [link_to_load] })
-    onMounted(() => {
-        build_site_root()
-        // console.log('data', site_data.value)
-    })
-    watch(link_to_load, async () => {
-        await site.refresh()
-        build_site_root()
-    })
-    watch(selector, () => select())
+    onMounted(build_site_root)
+    watch(link_to_load, build_site_root)
+    watch(selector, select)
     function select() {
         if (!site_holder.value) return
         if (!site_holder.value.shadowRoot) return
@@ -43,11 +36,12 @@
         const selection = site_holder.value.shadowRoot.querySelector(selector.value)
         // console.log(site_holder.value.shadowRoot, selection)
         if (!selection) {
-            selection_holder.value.shadowRoot.innerHTML = 'selector not found in site'
+            selection_holder.value!.shadowRoot!.innerHTML = 'selector not found in site'
             return
         }
-        selection_holder.value.shadowRoot.innerHTML = ''
-        selection_holder.value.shadowRoot.appendChild(selection.cloneNode(true));
+        selection_holder.value!.shadowRoot!.innerHTML = ''
+        const selector_node = selection.cloneNode(true)
+        selection_holder.value!.shadowRoot!.appendChild(selector_node);
 
     }
 
@@ -57,10 +51,8 @@
             if (!holder.value.shadowRoot) holder.value.attachShadow({ mode: 'open' });
         }
         
-        const parser = new DOMParser()
-        const selection_html = parser.parseFromString(<string><any>site.error.value ?? site.data.value ?? 'no data', 'text/html')
-        site_holder.value.shadowRoot.innerHTML = ''
-        site_holder.value.shadowRoot.appendChild(selection_html.documentElement);
+        site_holder.value!.shadowRoot!.innerHTML = ''
+        site_holder.value!.shadowRoot!.appendChild((new DOMParser().parseFromString(<string><any>site.error.value ?? site.data.value ?? 'no data', 'text/html')).documentElement);
         select()
     }
 </script>
