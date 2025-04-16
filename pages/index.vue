@@ -4,7 +4,7 @@
         <NuxtLink to="/test-page">Test Page</NuxtLink>
         <br />
         <label for="link">Link</label>
-        <input type="text" id="link" name="link" v-model.lazy="link" />
+        <input type="text" id="link" name="link" v-model="link" />
         <br />
         <label for="selector">Selector</label>
         <input type="text" id="selector" name="selector" v-model="selector" />
@@ -18,7 +18,7 @@
     import { NuxtLink } from '#components'
 
     const link = ref(<string>useRoute().query.site || 'https://www.example.com')
-    const link_to_load = computed(() => `http://localhost:3000/api/site?link=${encodeURIComponent(link.value)}`)
+    const link_to_load = computed(() => `${useRequestURL().origin}/api/site?link=${encodeURIComponent(link.value)}`) // useRequestURL() needed for SSR to work; /api/site as a reative route does not work on the server.
     const selector = ref('body>div>h1 ~ p ~ p')
     const site_holder = useTemplateRef('site_holder')
     const selection_holder = useTemplateRef('selection_holder')
@@ -41,11 +41,12 @@
         if (!site_holder.value.shadowRoot) return
 
         const selection = site_holder.value.shadowRoot.querySelector(selector.value)
-        console.log(site_holder.value.shadowRoot, selection)
+        // console.log(site_holder.value.shadowRoot, selection)
         if (!selection) {
             selection_holder.value.shadowRoot.innerHTML = 'selector not found in site'
             return
         }
+        selection_holder.value.shadowRoot.innerHTML = ''
         selection_holder.value.shadowRoot.appendChild(selection.cloneNode(true));
 
     }
@@ -55,8 +56,11 @@
             if (!holder.value) return
             if (!holder.value.shadowRoot) holder.value.attachShadow({ mode: 'open' });
         }
-        /* @ts-ignore */
-        site_holder.value.shadowRoot.innerHTML = <string><any>site.error.value ?? site.data.value ?? 'no data';
+        
+        const parser = new DOMParser()
+        const selection_html = parser.parseFromString(<string><any>site.error.value ?? site.data.value ?? 'no data', 'text/html')
+        site_holder.value.shadowRoot.innerHTML = ''
+        site_holder.value.shadowRoot.appendChild(selection_html.documentElement);
         select()
     }
 </script>
