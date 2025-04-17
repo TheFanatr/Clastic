@@ -1,7 +1,12 @@
 {
   "name": "nuxt-app",
+  "dependencies": {
+    "jsdom": "^26.1.0",
+    "nuxt": "^3.16.2",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
   "private": true,
-  "type": "module",
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
@@ -9,12 +14,11 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare"
   },
-  "dependencies": {
-    "nuxt": "^3.16.2",
-    "vue": "^3.5.13",
-    "vue-router": "^4.5.0"
-  },
   "trustedDependencies": [
     "@parcel/watcher"
-  ]
+  ],
+  "type": "module",
+  "devDependencies": {
+    "@types/jsdom": "^21.1.7"
+  }
 }
