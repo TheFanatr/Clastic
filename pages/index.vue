@@ -27,15 +27,8 @@
     const site = computed(() => tree_builder.value.parseFromString(<string>site_text.data.value, 'text/html').documentElement)
     let selection_count = 0
     
-    const selections = computed(() => {
-        site.value
-        return (selection_count = 0) || new Map(Array.from(site.value.querySelectorAll(selector.value)).map(selection => [`selection_${++selection_count}`, { selection: <HTMLElement>selection.cloneNode(true), styles: window.getComputedStyle(selection) }]))
-    })
+    const selections = computed(() => site.value && (selection_count = 0) || new Map(Array.from(site.value.querySelectorAll(selector.value)).map(selection => [`selection_${++selection_count}`, { selection: <HTMLElement>selection.cloneNode(true), styles: window.getComputedStyle(selection) }])))
 </script>
 
 <style scoped>
-    .site {
-        overflow-y: scroll;
-        max-height: 20vh;
-    }
 </style>
