@@ -9,51 +9,28 @@
         <label for="selector">Selector</label>
         <input type="text" id="selector" name="selector" v-model="selector" />
         <br />
-        <div ref="site_dock" />
-        <div v-for="[selection_identifier] in selection_holders" :key="selection_identifier" :ref="`${selection_identifier}_dock`" :data-holder="selection_identifier">
-            {{ selection_identifier }}
-        </div>
+        <Dock v-for="[selection_identifier, { selection, styles }] in selections" :tree="selection" :styles="styles" :key="selection_identifier" />
+        <Dock :tree="site" :styles="null" />
     </div>
 </template>
 
 <script setup lang="ts">
     import { NuxtLink } from '#components'
-
+    import Dock from '~/components/Dock.vue'
+    
     const link = ref(<string>useRoute().query.site || 'https://www.example.com')
     const link_to_load = computed(() => `${useRequestURL().origin}/api/site?link=${encodeURIComponent(link.value)}`) // useRequestURL() needed for SSR to work; /api/site as a reative route does not work on the server.
     const selector = ref('html>body>div>h1')
     const tree_builder = ref(new DOMParser())
-    let node_identifier = 0
 
     const site_text = useFetch(link_to_load)
     const site = computed(() => tree_builder.value.parseFromString(<string>site_text.data.value, 'text/html').documentElement)
-    const site_holder = computed(() => {
-        const holder = document.createElement('div')
-        holder.attachShadow({ mode: 'open' })
-        holder.shadowRoot!.appendChild(site.value)
-        return holder
+    let selection_count = 0
+    
+    const selections = computed(() => {
+        site.value
+        return (selection_count = 0) || new Map(Array.from(site.value.querySelectorAll(selector.value)).map(selection => [`selection_${++selection_count}`, { selection: <HTMLElement>selection.cloneNode(true), styles: window.getComputedStyle(selection) }]))
     })
-    const selections = computed(() => Array.from(site.value.querySelectorAll(selector.value)))
-    const selection_holders = computed(() => (node_identifier = 0) || new Map(
-        selections.value
-            .map(selected => {
-                const holder = document.createElement('div')
-                holder.attachShadow({ mode: 'open' })
-                const clone = <HTMLElement>selected.cloneNode(true)
-                console.log('elements', selected, clone)
-                Array.from(getComputedStyle(selected)).forEach(([key, value]) => clone.style.setProperty(key, value))
-                holder.shadowRoot!.appendChild(clone)
-                return [holder.id = `selection_${node_identifier++}`, holder]
-            })))
-    const site_dock = useTemplateRef('site_dock')
-    const selection_docks = computed(() => new Map(Array.from(selection_holders.value.entries()).map(([selection_identifier, holder]) => [selection_identifier, <Readonly<Ref<HTMLElement>>>useTemplateRef(`${selection_identifier}_dock`)])))
-    onMounted(dock_holders)
-    watch(site_holder, dock_holders)
-    watch(selection_holders, dock_holders)
-    function dock_holders() {
-        site_dock.value!.appendChild(site_holder.value)
-        Array.from(selection_docks.value.entries()).forEach(([selection_identifier, dock]) => dock.value!.appendChild(selection_holders.value.get(selection_identifier)!))
-    }
 </script>
 
 <style scoped>
