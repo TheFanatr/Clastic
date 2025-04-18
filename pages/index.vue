@@ -8,74 +8,57 @@
         <br />
         <label for="selector">Selector</label>
         <input type="text" id="selector" name="selector" v-model="selector" />
-        <!-- Add a button to manually refresh if needed -->
-        <button @click="refresh()" :disabled="pending">Apply Selector</button>
         <br />
-        <!-- Remove the old site dock -->
-        <!-- <div ref="site_dock" class="site-preview-dock"></div> --> 
-        <hr />
-        <h2>Selections:</h2>
-        <!-- Pass the html and styles to the component -->
-        <SelectionDisplay 
-            v-for="(selection, index) in selections" 
-            :key="`${apiUrl}-${index}`" 
-            :html="selection.html"
-            :styles="selection.styles"
-        />
-         <p v-if="pending">Loading selections...</p>
-         <p v-if="!pending && selections?.length === 0 && !error">No elements found for selector: {{ selector }}</p>
-         <p v-if="error">Error loading site: {{ error.message }}</p>
+        <div ref="site_dock" />
+        <div v-for="[selection_identifier] in selection_holders" :key="selection_identifier" :ref="`${selection_identifier}_dock`" :data-holder="selection_identifier">
+            {{ selection_identifier }}
+        </div>
     </div>
 </template>
 
 <script setup lang="ts">
     import { NuxtLink } from '#components'
-    // SelectionDisplay component is auto-imported by Nuxt
-    import { ref, computed, watch, onMounted } from 'vue' 
 
     const link = ref(<string>useRoute().query.site || 'https://www.example.com')
-    const selector = ref('html>body>div>h1') // Example selector
+    const link_to_load = computed(() => `${useRequestURL().origin}/api/site?link=${encodeURIComponent(link.value)}`) // useRequestURL() needed for SSR to work; /api/site as a reative route does not work on the server.
+    const selector = ref('html>body>div>h1')
+    const tree_builder = ref(new DOMParser())
+    let node_identifier = 0
 
-    // Computed property for the API URL, now including the selector
-    const apiUrl = computed(() => 
-        `/api/site?link=${encodeURIComponent(link.value)}&selector=${encodeURIComponent(selector.value)}`
-    )
-
-    // Define the expected data structure from the API
-    interface SelectionData {
-        html: string;
-        styles: Record<string, string>;
-    }
-
-    // Fetch data using the combined API URL
-    const { data: selectionsData, pending, error, refresh } = useFetch<SelectionData[]>(apiUrl, {
-         immediate: true,
-         // Default value is needed for v-for during initial load/pending
-         default: () => [], 
-         // watch: false // If you want to trigger refresh manually, e.g., on button click
+    const site_text = useFetch(link_to_load)
+    const site = computed(() => tree_builder.value.parseFromString(<string>site_text.data.value, 'text/html').documentElement)
+    const site_holder = computed(() => {
+        const holder = document.createElement('div')
+        holder.attachShadow({ mode: 'open' })
+        holder.shadowRoot!.appendChild(site.value)
+        return holder
     })
-
-    // Computed property for the selections, now directly using the fetched data
-    const selections = computed(() => selectionsData.value || []);
-
-    // --- Remove or adapt the old site_document_element and site_holder logic ---
-    // const tree_builder = new DOMParser(); 
-    // const site_document_element = computed(() => { ... });
-    // const site_holder = computed(() => { ... }); 
-    // const site_dock = ref<HTMLDivElement | null>(null);
-    // function dockMainSite() { ... }
-    // watch(site_holder, dockMainSite, { immediate: true });
-    // onMounted(dockMainSite);
-    // -------------------------------------------------------------------------
-
+    const selections = computed(() => Array.from(site.value.querySelectorAll(selector.value)))
+    const selection_holders = computed(() => (node_identifier = 0) || new Map(
+        selections.value
+            .map(selected => {
+                const holder = document.createElement('div')
+                holder.attachShadow({ mode: 'open' })
+                const clone = <HTMLElement>selected.cloneNode(true)
+                console.log('elements', selected, clone)
+                Array.from(getComputedStyle(selected)).forEach(([key, value]) => clone.style.setProperty(key, value))
+                holder.shadowRoot!.appendChild(clone)
+                return [holder.id = `selection_${node_identifier++}`, holder]
+            })))
+    const site_dock = useTemplateRef('site_dock')
+    const selection_docks = computed(() => new Map(Array.from(selection_holders.value.entries()).map(([selection_identifier, holder]) => [selection_identifier, <Readonly<Ref<HTMLElement>>>useTemplateRef(`${selection_identifier}_dock`)])))
+    onMounted(dock_holders)
+    watch(site_holder, dock_holders)
+    watch(selection_holders, dock_holders)
+    function dock_holders() {
+        site_dock.value!.appendChild(site_holder.value)
+        Array.from(selection_docks.value.entries()).forEach(([selection_identifier, dock]) => dock.value!.appendChild(selection_holders.value.get(selection_identifier)!))
+    }
 </script>
 
 <style scoped>
-    /* Remove or adapt old styles */
-    h2 {
-        margin-top: 20px;
-    }
-    button {
-        margin-left: 10px;
+    .site {
+        overflow-y: scroll;
+        max-height: 20vh;
     }
 </style>
