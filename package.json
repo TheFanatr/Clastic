@@ -3,6 +3,7 @@
   "dependencies": {
     "jsdom": "^26.1.0",
     "nuxt": "^3.16.2",
+    "puppeteer": "^24.6.1",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"
   },

@@ -8,20 +8,23 @@
         <br />
         <label for="selector">Selector</label>
         <input type="text" id="selector" name="selector" v-model="selector" />
+        <!-- Add a button to manually refresh if needed -->
+        <button @click="refresh()" :disabled="pending">Apply Selector</button>
         <br />
-        <!-- Dock for the whole site (optional, can be removed if not needed) -->
-        <div ref="site_dock" class="site-preview-dock"></div> 
+        <!-- Remove the old site dock -->
+        <!-- <div ref="site_dock" class="site-preview-dock"></div> --> 
         <hr />
         <h2>Selections:</h2>
-        <!-- Use the new component -->
+        <!-- Pass the html and styles to the component -->
         <SelectionDisplay 
-            v-for="(element, index) in selections" 
-            :key="`${link}-${selector}-${index}`" 
-            :selected-element="element"
+            v-for="(selection, index) in selections" 
+            :key="`${apiUrl}-${index}`" 
+            :html="selection.html"
+            :styles="selection.styles"
         />
-         <p v-if="!selections.length && !site_text.pending.value">No elements found for selector: {{ selector }}</p>
-         <p v-if="site_text.pending.value">Loading site...</p>
-         <p v-if="site_text.error.value">Error loading site: {{ site_text.error.value.message }}</p>
+         <p v-if="pending">Loading selections...</p>
+         <p v-if="!pending && selections?.length === 0 && !error">No elements found for selector: {{ selector }}</p>
+         <p v-if="error">Error loading site: {{ error.message }}</p>
     </div>
 </template>
 
@@ -31,87 +34,48 @@
     import { ref, computed, watch, onMounted } from 'vue' 
 
     const link = ref(<string>useRoute().query.site || 'https://www.example.com')
-    const link_to_load = computed(() => `${useRequestURL().origin}/api/site?link=${encodeURIComponent(link.value)}`)
     const selector = ref('html>body>div>h1') // Example selector
-    
-    // Use DOMParser directly since SSR is off
-    const tree_builder = new DOMParser();
 
-    const site_text = useFetch(link_to_load, { immediate: true }) // Fetch immediately
+    // Computed property for the API URL, now including the selector
+    const apiUrl = computed(() => 
+        `/api/site?link=${encodeURIComponent(link.value)}&selector=${encodeURIComponent(selector.value)}`
+    )
 
-    // Computed property to get the parsed document's root element
-    const site_document_element = computed(() => {
-        if (site_text.data.value && typeof site_text.data.value === 'string') {
-            try {
-                return tree_builder.parseFromString(site_text.data.value, 'text/html').documentElement;
-            } catch (e) {
-                 console.error("Error parsing HTML:", e);
-                 return null;
-            }
-        } 
-        return null;
-    });
-
-    // Keep the original site holder logic separate for now if needed for preview
-    const site_holder = computed(() => {
-        if (!site_document_element.value) return null;
-        const holder = document.createElement('div');
-        holder.className = 'site-content-holder'; // Add class for potential styling
-        holder.attachShadow({ mode: 'open' });
-        // Clone the root to avoid modifying the computed source
-        holder.shadowRoot!.appendChild(site_document_element.value.cloneNode(true));
-        return holder;
-    });
-
-    // Compute the selected elements based on the parsed document
-    const selections = computed(() => {
-        if (!site_document_element.value) return [];
-        try {
-             // querySelectorAll needs to run on the parsed element
-            return Array.from(site_document_element.value.querySelectorAll(selector.value));
-        } catch (e) {
-            console.error("Error running querySelectorAll:", e);
-            return [];
-        }
-    });
-
-    // Ref for the main site dock element
-    const site_dock = ref<HTMLDivElement | null>(null);
-
-    // Function to dock the main site preview (if used)
-    function dockMainSite() {
-         if (site_dock.value && site_holder.value) {
-             console.log("Docking main site preview...");
-             site_dock.value.innerHTML = ''; // Clear previous
-             site_dock.value.appendChild(site_holder.value);
-         } else if (site_dock.value) {
-              site_dock.value.innerHTML = 'Loading site preview...'; // Placeholder
-         }
+    // Define the expected data structure from the API
+    interface SelectionData {
+        html: string;
+        styles: Record<string, string>;
     }
 
-    // Watch for changes in the computed site_holder and dock it
-    watch(site_holder, dockMainSite, { immediate: true });
-    // Ensure docking happens after mount as well
-    onMounted(dockMainSite);
+    // Fetch data using the combined API URL
+    const { data: selectionsData, pending, error, refresh } = useFetch<SelectionData[]>(apiUrl, {
+         immediate: true,
+         // Default value is needed for v-for during initial load/pending
+         default: () => [], 
+         // watch: false // If you want to trigger refresh manually, e.g., on button click
+    })
 
-    // No longer need selection_holders, selection_docks, dock_holders
+    // Computed property for the selections, now directly using the fetched data
+    const selections = computed(() => selectionsData.value || []);
+
+    // --- Remove or adapt the old site_document_element and site_holder logic ---
+    // const tree_builder = new DOMParser(); 
+    // const site_document_element = computed(() => { ... });
+    // const site_holder = computed(() => { ... }); 
+    // const site_dock = ref<HTMLDivElement | null>(null);
+    // function dockMainSite() { ... }
+    // watch(site_holder, dockMainSite, { immediate: true });
+    // onMounted(dockMainSite);
+    // -------------------------------------------------------------------------
 
 </script>
 
 <style scoped>
-    /* Styles for the main site preview dock */
-    .site-preview-dock {
-        border: 1px solid #ccc;
-        margin: 10px 0;
-        height: 300px; /* Example fixed height */
-        overflow: auto; /* Allow scrolling */
-    }
-    .site-content-holder {
-        /* If you need to style the holder itself */
-        width: 100%;
-        height: 100%;
-    }
+    /* Remove or adapt old styles */
     h2 {
         margin-top: 20px;
+    }
+    button {
+        margin-left: 10px;
     }
 </style>
