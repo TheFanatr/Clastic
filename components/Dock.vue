@@ -8,9 +8,9 @@ const dock = useTemplateRef<HTMLDivElement>('dock')
 onMounted(dock_tree)
 function dock_tree() {
     dock.value!.attachShadow({ mode: 'open' })
+    dock.value!.shadowRoot!.innerHTML = ''
     dock.value!.shadowRoot!.appendChild(tree)
     if (!styles) return
-    console.log('styles', styles)
     Array.from(styles).forEach(style => tree.style.setProperty(style, styles.getPropertyValue(style), styles.getPropertyPriority(style)))
 }
 </script>
